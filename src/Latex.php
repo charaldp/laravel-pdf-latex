@@ -65,19 +65,29 @@ class Latex
      */
     public function __construct($stubPath = null, $metadata = null, $pdflatexPath = 'pdflatex')
     {
-        if (!in_array(PHP_OS_FAMILY, ['Linux'])){
-            throw new LatextException("Unsupported Operating System");
+        // if (!in_array(PHP_OS_FAMILY, ['Linux'])){
+        //     throw new LatextException("Unsupported Operating System");
+        // }
+        if (in_array(PHP_OS_FAMILY, ['Linux'])){
+            $process = new Process("which " . $pdflatexPath);
+            $process->run();
+            
+            if (!$process->isSuccessful()) {
+                throw new LatextException($process->getOutput());
+            }
+
+            $this->binPath = trim($process->getOutput());
+        } elseif(in_array(PHP_OS_FAMILY, ['Windows'])) {
+            $process = new Process("where " . $pdflatexPath);
+            $process->run();
+            
+            if (!$process->isSuccessful()) {
+                throw new LatextException($process->getOutput());
+            }
+
+            $this->binPath = trim($process->getOutput());
         }
 
-        $process = new Process("which " . $pdflatexPath);
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            throw new LatextException($process->getOutput());
-        }
-
-        $this->binPath = trim($process->getOutput());
-        
         if ($stubPath instanceof RawTex) {
             $this->isRaw = true;
             $this->renderedTex = $stubPath->getTex();
@@ -218,7 +228,9 @@ class Latex
         }
 
         \Event::dispatch(new LatexPdfWasGenerated($fileName, 'download', $this->metadata));
-
+        if (in_array(PHP_OS_FAMILY, ['Windows'])){
+            $pdfPath = str_replace(['.tmp'], '', $pdfPath);
+        }
         return \Response::download($pdfPath, $fileName, [
               'Content-Type' => 'application/pdf',
         ]);
